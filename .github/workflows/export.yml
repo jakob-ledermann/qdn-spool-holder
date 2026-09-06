@@ -27,7 +27,7 @@ jobs:
           cache-downloads: true
 
       - name: Verify fixtures
-        shell: micromamba-shell
+        shell: micromamba-shell {0}
         run: |
           set +e
           fc=$(command -v freecadcmd || command -v FreeCADCmd)
@@ -42,7 +42,7 @@ jobs:
           exit $rc
 
       - name: Export prints + preview
-        shell: micromamba-shell
+        shell: micromamba-shell {0}
         run: |
           set +e
           fc=$(command -v freecadcmd || command -v FreeCADCmd)
