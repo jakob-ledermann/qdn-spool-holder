@@ -1,0 +1,5 @@
+*.bak
+*.bak-*
+*.FCBak
+
+__pycache__
