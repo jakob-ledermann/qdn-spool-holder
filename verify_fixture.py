@@ -30,6 +30,10 @@ WALL = os.path.join(HERE, "Wall_QDN.FCStd")
 BRACKET = os.path.join(HERE, "SpoolHolder.FCStd")
 ASSEMBLY = os.path.join(HERE, "Assembly.FCStd")
 
+# Latched lip hook: the bracket hangs ~1 mm below exact grid center so the lip
+# overhang seats on the sheet edge below each hole (matches manual seating).
+SEAT_Y_NUDGE = -1.0
+
 TOL = 5e-3  # relative tolerance for volume checks
 
 checks = []
@@ -79,6 +83,32 @@ def find_pads(body, sub):
         if o.TypeId == "PartDesign::Pad" and sub.lower() in o.Label.lower():
             out.append(o)
     return out
+
+
+def wall_grid_origin(body):
+    """Measure the first hole-column/row center from the wall solid.
+
+    The model's x-margin (33.05 mm) is not the centered bbox margin, so the
+    grid origin must be read from the hole walls directly. Returns
+    (col0_x, row0_y), hole centers at (col0 + c*pitch, row0 + r*pitch).
+    """
+    x_min_wall = y_min_wall = None
+    for f in body.Shape.Faces:
+        if "Plane" not in f.Surface.TypeId:
+            continue
+        bb = f.BoundBox
+        if not (bb.XLength < 12 and bb.YLength < 12 and bb.ZLength < 3):
+            continue
+        n = f.normalAt(0.5, 0.5)
+        if abs(n.x) > 0.99:
+            cx = bb.Center.x
+            x_min_wall = cx if x_min_wall is None else min(x_min_wall, cx)
+        elif abs(n.y) > 0.99:
+            cy = bb.Center.y
+            y_min_wall = cy if y_min_wall is None else min(y_min_wall, cy)
+    if x_min_wall is None or y_min_wall is None:
+        return None
+    return (x_min_wall + 5.0, y_min_wall + 5.0)
 
 
 def invalid_features(doc):
@@ -313,10 +343,123 @@ else:
 
 # ---------------------------------------------------------------- Assembly
 print("\n== Assembly.FCStd ==")
-if os.path.exists(ASSEMBLY):
-    check("assembly file present", True)
-else:
+if not os.path.exists(ASSEMBLY):
     check("assembly file present", False, "run Step C manually in GUI")
+else:
+    check("assembly file present", True, os.path.basename(ASSEMBLY))
+    try:
+        adoc = App.openDocument(ASSEMBLY, True)
+        adoc.recompute()
+    except Exception as e:
+        check("assembly loads without errors", False, str(e))
+        cleanup()
+        sys.exit(1)
+
+    asm = next((o for o in adoc.Objects
+                if o.TypeId == "Assembly::AssemblyObject"), None)
+    if asm is None:
+        check("assembly object present", False)
+    else:
+        check("assembly object present", True, asm.Label)
+        links = {}
+        for o in asm.OutList:
+            t = type(o).__name__
+            if "Link" in t or "DocumentObject" in t:
+                links[o.Label] = o
+        wall = links.get("Wall_Linked")
+        b1 = links.get("Bracket1")
+        b2 = links.get("Bracket2")
+        check("assembly: wall link present", wall is not None)
+        check("assembly: bracket 1 present", b1 is not None)
+        check("assembly: bracket 2 present", b2 is not None)
+
+        # Expected wall hole grid (from Wall_QDN params + measured bbox)
+        wdoc = App.openDocument(WALL, True)
+        wsheet = get_sheet(wdoc)
+        wp = get_alias_map(wsheet) if wsheet else {}
+        try:
+            pitch = float(wp["pitch"].split()[0])
+            cols = int(wp["cols"])
+            rows = int(wp["rows"])
+        except Exception:
+            pitch, cols, rows = None, None, None
+        wbody = find_body(wdoc)
+        wbb = wbody.Shape.BoundBox if wbody else None
+
+        # bracket geometry (verified local landmarks, see PLAN.md §7)
+        lug_x, lug_lo_y, lug_hi_y = 10.0, -43.75, -5.75
+        bore_y, bore_z = -26.0, 44.0
+
+        def on_grid(x, y, tol=0.5):
+            if not (pitch and cols and rows and wbody):
+                return False
+            origin = wall_grid_origin(wbody)
+            if not origin:
+                return False
+            ox, oy = origin
+            near_x = any(abs(x - (ox + c * pitch)) < tol for c in range(cols))
+            near_y = any(abs(y - (oy + r * pitch + SEAT_Y_NUDGE)) < tol
+                         for r in range(rows))
+            return near_x and near_y
+
+        for name, b in [("Bracket1", b1), ("Bracket2", b2)]:
+            if b is None:
+                continue
+            pl = b.Placement
+            lo = (pl.Base.x + lug_x, pl.Base.y + lug_lo_y)
+            hi = (pl.Base.x + lug_x, pl.Base.y + lug_hi_y)
+            check(f"assembly: {name} lugs on wall grid",
+                  on_grid(*lo) and on_grid(*hi),
+                  f"lugs at X={pl.Base.x + lug_x:g} "
+                  f"Y={lo[1]:g}/{hi[1]:g}")
+        if wbb:
+            wall_front = wbb.ZMax
+        else:
+            wall_front = None
+
+        rod = None
+        for o in adoc.Objects:
+            if o.Label == "Rod_M6" or (o.TypeId == "Part::Feature"
+                                       and "Rod" in o.Label):
+                rod = o
+        if rod is None or rod.Shape is None:
+            check("assembly: rod present", False)
+        else:
+            check("assembly: rod present", True,
+                  f"Ø{2 * rod.Shape.BoundBox.ZLength / 2:g} (axis along X)")
+            ax = rod.Placement.Rotation.multVec(App.Vector(0, 0, 1))
+            check("assembly: rod parallel to wall (along X)",
+                  ax.x > 0.99 and abs(ax.y) < 0.01 and abs(ax.z) < 0.01,
+                  f"axis=({ax.x:.2f},{ax.y:.2f},{ax.z:.2f})")
+            if b1 is not None and b2 is not None:
+                xmin = min(b1.Placement.Base.x, b2.Placement.Base.x)
+                xmax = max(b1.Placement.Base.x, b2.Placement.Base.x) + 20.0
+                rbb = rod.Shape.BoundBox
+                check("assembly: rod spans both brackets",
+                      rbb.XMin <= xmin + 0.1 and rbb.XMax >= xmax - 0.1,
+                      f"rod X {rbb.XMin:g}..{rbb.XMax:g} vs plates "
+                      f"{xmin:g}..{xmax:g}")
+            if b1 is not None and wall_front is not None:
+                by = b1.Placement.Base.y + bore_y
+                bz = b1.Placement.Base.z + bore_z
+                check("assembly: rod passes through bracket bores",
+                      abs(rod.Placement.Base.y - by) < 0.02
+                      and abs(rod.Placement.Base.z - bz) < 0.02,
+                      f"rod axis Y={rod.Placement.Base.y:g} Z={rod.Placement.Base.z:g} "
+                      f"vs bore Y={by:g} Z={bz:g}")
+
+        spools = [o for o in adoc.Objects
+                  if o.TypeId == "Part::Feature"
+                  and o.Label.lower().startswith("spool")]
+        check("assembly: 3 spools present", len(spools) == 3,
+              f"{len(spools)} found")
+        if spools and wall_front is not None:
+            minz = min(o.Shape.BoundBox.ZMin for o in spools)
+            check("assembly: spool clearance to wall", minz - wall_front >= 5,
+                  f"bottom at {minz:g}, wall front {wall_front:g} "
+                  f"-> gap {minz - wall_front:.1f} mm")
+
+    cleanup()
 
 print()
 if failures:

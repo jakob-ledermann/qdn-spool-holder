@@ -186,11 +186,27 @@ nix-shell --run "freecadcmd --console verify_fixture.py"
 
 `verify_fixture.py` (see §7) loads the two `.FCStd` files and reports PASS/FAIL
 with exit code 0/1:
-- Wall: hole size 10 mm, pitch 38 mm, grid 32×6, bbox 1268×190×~1.2 mm,
+- Wall: hole size 10 mm, pitch 38 mm, grid 32×5, bbox 1268×190×~1.2 mm,
   computed volume matches solid-minus-holes within tolerance.
 - Bracket: lug centers 38 mm, lug size ~8.8 mm, sleeve bore ≥ M6, axis
   horizontal.
-- Assembly presence: `Assembly_QDN.FCStd` exists (manual fit already done).
+- Assembly (`Assembly.FCStd`, built via script — see below): wall link +
+  two bracket links, lugs seated on the wall grid (holes col 11 & 20,
+  rows 1+2, with the ~1 mm latch-seat nudge), rod Ø6 horizontal (along X)
+  spanning both brackets and passing through both bores, 3 spools with ≥ 5 mm
+  wall clearance. Grid origin is **measured from the wall solid** (col0=33.05,
+  row0=−171 — the model's x-margin is 33.05, not the centered 45). Positions
+  use fixed link placements (no solver joints) so the mock renders
+  deterministically; drag with *Move* to inspect.
+
+### Step C — built (scripted)
+
+`Assembly.FCStd` is generated headlessly (`build_assembly.py` style): wall
+grounded at origin, `Bracket1` at X=403.05, `Bracket2` at X=743.05, both with
+lugs on the grid (col 11/20, rows 1+2) minus the 1 mm lip-seat nudge, rod
+`Rod_M6` (Ø6×364) from X=402.05..766.05 through the two bores, spools
+`Spool1..3` (Ø70×100) centered on the rod. Verified by the 12 assembly checks
+in `verify_fixture.py` (§ Step D).
 
 ---
 
