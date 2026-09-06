@@ -8,6 +8,7 @@ pkgs.mkShell {
   shellHook = ''
     echo "FreeCAD environment ready."
     echo "  - GUI:        freecad"
-    echo "  - Headless:   freecadcmd --console verify_fixture.py"
+    echo "  - Verify:     freecadcmd -c \"exec(open('verify_fixture.py').read())\""
+    echo "  - Export:     freecadcmd -c \"exec(open('export_qdn.py').read())\""
   '';
 }

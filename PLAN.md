@@ -210,6 +210,52 @@ in `verify_fixture.py` (§ Step D).
 
 ---
 
+## 6a. Exports & CI (headless, deterministic)
+
+Run locally (needs `nix-shell`):
+
+```
+nix-shell --run "freecadcmd -c \"exec(open('export_qdn.py').read())\""
+```
+
+Writes into `exports/` (committed to the repo so GitHub renders STL/3MF inline):
+
+| File | What it is | Use |
+|---|---|---|
+| `export_qdn.py` | mesh → STL/3MF + GLB/HTML (headless) | `freecadcmd -c ...` |
+| `exports/SpoolHolder.stl` | printable bracket, ASCII STL | slice & print ×2 |
+| `exports/SpoolHolder.3mf` | printable bracket, 3MF | slice & print ×2 |
+| `exports/Assembly.glb` | full-system mesh preview | drag into viewers/slicers |
+| `exports/Assembly.html` | interactive view (three.js 0.172 from CDN — needs internet) | open in a browser |
+
+Print settings: PLA/PETG, 0.2 mm layers, 2–3 walls, ~25 % infill, no supports
+(plate faces the build plate, lugs/lips point up).
+
+Notes / quirks discovered:
+
+- FreeCAD's own glTF/GLB export writes **nothing** in headless mode, and
+  `importers.importWebGL` pulls in Qt/PySide6, which segfaults `freecadcmd`
+  at interpreter exit. So the GLB is written by a small built-in writer (see
+  `write_glb`) and the HTML reuses the stock BIM WebGL template directly with
+  non-compressed object data.
+- `freecadcmd --console script.py` sometimes drops into the REPL; the reliable
+  invocation is `freecadcmd -c "exec(open('NAME').read())"`.
+
+### CI
+
+`.github/workflows/export.yml` (micromamba + conda-forge `freecad=1.1.3`):
+
+1. `verify_fixture.py` — gate; fails the job on any failed check.
+2. `export_qdn.py` — regenerates `exports/`.
+3. Upload `exports/` as a workflow artifact.
+4. Commit `exports/` back to `main` (no-op when nothing changed; can't loop,
+   because `push` triggers only on `*.FCStd`, `*.py`, `PLAN.md`,
+   `.github/workflows/*`).
+
+Trigger manually via **Actions → Export → Run workflow**.
+
+---
+
 ## 7. BOM & print notes
 
 | # | Item | Detail |

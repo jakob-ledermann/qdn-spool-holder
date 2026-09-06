@@ -1,0 +1,60 @@
+name: Export
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "*.FCStd"
+      - "*.py"
+      - "PLAN.md"
+      - ".github/workflows/export.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up FreeCAD 1.1.3 (conda-forge)
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: freecad
+          create-args: freecad=1.1.3
+          cache-downloads: true
+
+      - name: Verify fixtures
+        shell: micromamba-shell
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          fc=$(command -v freecadcmd || command -v FreeCADCmd)
+          "$fc" -c "exec(open('verify_fixture.py').read())"
+
+      - name: Export prints + preview
+        shell: micromamba-shell
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          fc=$(command -v freecadcmd || command -v FreeCADCmd)
+          "$fc" -c "exec(open('export_qdn.py').read())"
+
+      - name: Upload exports artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: exports
+          path: exports
+
+      - name: Commit exports back to the repo
+        shell: bash -e {0}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add exports
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(exports): regenerate prints + preview"
+            git push
+          else
+            echo "exports up to date - nothing to commit"
+          fi

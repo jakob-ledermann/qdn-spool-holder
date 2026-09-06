@@ -25,7 +25,8 @@ except ImportError:
     print("FreeCAD not importable — run inside: nix-shell")
     sys.exit(1)
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() \
+    else os.getcwd()
 WALL = os.path.join(HERE, "Wall_QDN.FCStd")
 BRACKET = os.path.join(HERE, "SpoolHolder.FCStd")
 ASSEMBLY = os.path.join(HERE, "Assembly.FCStd")
