@@ -240,6 +240,9 @@ Notes / quirks discovered:
   non-compressed object data.
 - `freecadcmd --console script.py` sometimes drops into the REPL; the reliable
   invocation is `freecadcmd -c "exec(open('NAME').read())"`.
+- The 3MF is re-zipped with fixed entry timestamps (`normalize_3mf`) so the
+  committed bytes are reproducible — otherwise every CI run would stamp a new
+  timestamp into the archive and re-commit it.
 
 ### CI
 

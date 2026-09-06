@@ -22,6 +22,7 @@ import math
 import os
 import struct
 import sys
+import zipfile
 
 print = functools.partial(print, flush=True)
 
@@ -80,6 +81,22 @@ def mesh_of(shape, dev):
 
 
 # ------------------------------------------------------------------ GLB
+
+def normalize_3mf(path):
+    """Rewrite a 3MF zip with fixed entry timestamps so the bytes are
+    reproducible across runs (FreeCAD stamps the wall-clock time into the
+    zip entries, which would otherwise re-commit on every CI run)."""
+    with zipfile.ZipFile(path) as zin:
+        items = [(i, zin.read(i.filename)) for i in zin.infolist()]
+    tmp = path + ".tmp"
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+        for i, data in items:
+            j = zipfile.ZipInfo(i.filename, (1980, 1, 1, 0, 0, 0))
+            j.compress_type = i.compress_type
+            j.create_system = 0
+            j.external_attr = 0
+            zout.writestr(j, data)
+    os.replace(tmp, path)
 
 def write_glb(mesh, path):
     """Write a minimal but valid glTF 2.0 binary (GLB) for a triangle mesh."""
@@ -266,6 +283,8 @@ def main():
     for ext in ("stl", "3mf"):
         target = os.path.join(OUT, "SpoolHolder.%s" % ext)
         bracket_mesh.write(target)
+        if ext == "3mf":
+            normalize_3mf(target)
         results.append(target)
         print("  wrote %-28s %8d bytes" % (os.path.basename(target),
                                             os.path.getsize(target)))
