@@ -29,16 +29,46 @@ jobs:
       - name: Verify fixtures
         shell: micromamba-shell
         run: |
-          export QT_QPA_PLATFORM=offscreen
+          set +e
           fc=$(command -v freecadcmd || command -v FreeCADCmd)
-          "$fc" -c "exec(open('verify_fixture.py').read())"
+          echo "using: ${fc:-NONE}"
+          ls -l "$CONDA_PREFIX/bin" | grep -i freecad || true
+          "$fc" --version 2>&1 | tail -2
+          "$fc" -c "exec(open('verify_fixture.py').read())" > verify.log 2>&1
+          rc=$?
+          tail -n 60 verify.log
+          echo "VERIFY_RC=$rc" > /tmp/verify_rc.txt
+          set -e
+          exit $rc
 
       - name: Export prints + preview
         shell: micromamba-shell
         run: |
-          export QT_QPA_PLATFORM=offscreen
+          set +e
           fc=$(command -v freecadcmd || command -v FreeCADCmd)
-          "$fc" -c "exec(open('export_qdn.py').read())"
+          "$fc" -c "exec(open('export_qdn.py').read())" > export.log 2>&1
+          rc=$?
+          tail -n 60 export.log
+          echo "EXPORT_RC=$rc" > /tmp/export_rc.txt
+          set -e
+          exit $rc
+
+      - name: Publish diagnostics
+        if: always()
+        shell: bash -e {0}
+        run: |
+          {
+            echo '### verify.log (tail)'
+            echo '```'
+            tail -n 40 verify.log 2>/dev/null || echo 'no verify.log'
+            echo '```'
+            echo '### export.log (tail)'
+            echo '```'
+            tail -n 40 export.log 2>/dev/null || echo 'no export.log'
+            echo '```'
+            echo "VERIFY_RC=$(cat /tmp/verify_rc.txt 2>/dev/null || echo n/a)"
+            echo "EXPORT_RC=$(cat /tmp/export_rc.txt 2>/dev/null || echo n/a)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload exports artifact
         uses: actions/upload-artifact@v4
