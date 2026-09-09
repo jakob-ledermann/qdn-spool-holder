@@ -44,21 +44,23 @@ Spool holder bracket (all in one spreadsheet):
 
 | Parameter | Value | Notes |
 |---|---|---|
-| `lug_size` | 8.8 mm | 10 mm hole − ~1.2 mm print clearance |
-| `lug_pitch_y` | 38 mm | vertical c–c of the two latch lugs |
-| `plate_h` | 52 mm | backplate height |
-| `plate_w` | 40 mm | backplate width |
+| `lug_size` | 8.8 mm | 10 mm hole − ~1.2 mm print clearance (0.6 mm/side) |
+| `lug_pitch_y` | 38 mm | vertical c–c of the two latch lugs (= wall grid pitch) |
+| `plate_h` | 52 mm | backplate height (covers the 48 mm hole pair) |
+| `plate_w` | 14 mm | backplate width |
 | `plate_t` | 4 mm | backplate thickness |
-| `toggle_depth` | 6 mm | lug insertion behind sheet |
-| `toggle_lip` | 2.5 mm | catch lip that hooks behind the sheet |
+| `toggle_depth` | 6 mm | lug insertion behind the sheet (hook reach) |
+| `toggle_lip` | 3 mm | catch lip depth that wraps the sheet strip |
+| `toggle_clearing` | 2 mm | lead-in clearance (diagonal stays; insertion/min-clearance are verified, not forbidden) |
 | `axle_dia` | 6.5 mm | bore for M6 rod (clearance) |
 | `sleeve_od` | 14 mm | (unused in pylon style; bore geometry wins) |
 | `seat_depth` | 14 mm | rod seat length along the rod, per end bracket; nut presses on outer face |
-| `standoff` | 44 mm | rod center distance from the wall (`44 − 25 = 19` mm back-spool clearance for Ø50) |
+| `standoff` | 5 mm | offset that lifts the seat base above the plate face (rod Y is set by the seat, not a wall distance) |
 | `n_spools` | 3 | default |
-| `spool_w` | (measure) | flange-to-flange width |
+| `spool_w` | 100 mm | flange-to-flange width (measured) |
 | `spool_gap` | 4 mm | spacing between spools |
-| `rod_len` | derived | `= n_spools*(spool_w+spool_gap) + 2*seat_depth + 24 mm` (2 ends × nut ≈ 12 mm) |
+| `spool_od` | 70 mm | spool flange outer diameter (clearance to wall checked) |
+| `rod_len` | 364 mm | `= n_spools*(spool_w+spool_gap) + 2*seat_depth + 24 mm` (2 ends × nut ≈ 12 mm) |
 
 ---
 
@@ -129,8 +131,9 @@ through the wall holes and hook behind the sheet; on the plate, a horizontal
 
 1. New document → save as `SpoolHolder.FCStd`.
 2. **Spreadsheet** `Params` with aliases from §3 (lug_size, lug_pitch_y,
-   plate_h/w/t, toggle_depth, toggle_lip, axle_dia, sleeve_od, seat_depth,
-   n_spools, spool_w, spool_gap, rod_len).
+   plate_h/w/t, toggle_depth, toggle_lip, toggle_clearing, axle_dia,
+   sleeve_od, seat_depth, standoff, n_spools, spool_w, spool_gap, spool_od,
+   rod_len).
 3. **Part Design** → `Create body` → `Plate`.
 4. On XY plane, sketch backplate outline: width `plate_w`, height `plate_h`
    (expressions). `Pad` → `plate_t`.
@@ -142,7 +145,9 @@ through the wall holes and hook behind the sheet; on the plate, a horizontal
 6. **Toggle lip:** on the *outer end* of each lug, add a small square boss
    `toggle_lip` × `lug_size` × 2 mm so it hooks behind the sheet. (May need a
    pocket first to create the hook seat — iterate to taste; keep the lip
-   on the side that faces the adjacent hole, QDN-style.)
+   on the side that faces the adjacent hole, QDN-style. The diagonal
+   lead-in is intentional; the verifier *measures* insertion clearance and
+   self-locking instead of banning it.)
 7. Axle holder (pylon style, connects itself — no manual fusion needed):
    Parts in one Body are welded automatically when they touch or overlap.
    - On the plate's **front face**, sketch a rectangle (suggest `seat_depth`
@@ -181,7 +186,7 @@ through the wall holes and hook behind the sheet; on the plate, a horizontal
 After modeling, run:
 
 ```
-nix-shell --run "freecadcmd --console verify_fixture.py"
+nix-shell --run "freecadcmd -c \"exec(open('verify_fixture.py').read())\""
 ```
 
 `verify_fixture.py` (see §7) loads the two `.FCStd` files and reports PASS/FAIL
@@ -191,21 +196,31 @@ with exit code 0/1:
 - Bracket: lug centers 38 mm, lug size ~8.8 mm, sleeve bore ≥ M6, axis
   horizontal.
 - Assembly (`Assembly.FCStd`, built via script — see below): wall link +
-  two bracket links, lugs seated on the wall grid (holes col 11 & 20,
-  rows 1+2, with the ~1 mm latch-seat nudge), rod Ø6 horizontal (along X)
+  two bracket links engaged with the wall grid, rod Ø6 horizontal (along X)
   spanning both brackets and passing through both bores, 3 spools with ≥ 5 mm
-  wall clearance. Grid origin is **measured from the wall solid** (col0=33.05,
-  row0=−171 — the model's x-margin is 33.05, not the centered 45). Positions
-  use fixed link placements (no solver joints) so the mock renders
-  deterministically; drag with *Move* to inspect.
+  wall clearance. The check set is **invariant-based**:
+  - `V0` no overlap in the rest position;
+  - `V1` the lug clears its hole walls during insertion (min running
+    clearance ≥ 0.4 mm, measured at the sheet plane — not just zero volume);
+  - `V2` the hook tucks ≥ 2 mm behind the sheet back face;
+  - `V3` the hook wraps ≥ 1.5 mm past the hole's bottom edge **and** the
+    load-bearing catch face leans ≤ 15° from the downwards axis (cam-out
+    guard — the diagonal lead-in is allowed but must not carry the load);
+  - `V4` the plate covers the hole pair fully and centers on it;
+  - `V5` the Ø6.5 through-bore exists along X and the rod threads both bores.
+  Hole rows/columns are **measured from the wall solid** (col 0 = 33.051,
+  row 0 = −171), so nothing is hard-coded. Positions use fixed link
+  placements (no solver joints) so the mock renders deterministically; drag
+  with *Move* to inspect.
 
 ### Step C — built (scripted)
 
 `Assembly.FCStd` is generated headlessly (`build_assembly.py` style): wall
-grounded at origin, `Bracket1` at X=403.05, `Bracket2` at X=743.05, both with
-lugs on the grid (col 11/20, rows 1+2) minus the 1 mm lip-seat nudge, rod
-`Rod_M6` (Ø6×364) from X=402.05..766.05 through the two bores, spools
-`Spool1..3` (Ø70×100) centered on the rod. Verified by the 12 assembly checks
+grounded at origin, `Bracket1` seated at X=406.05 (lug centre on hole col
+413.05), `Bracket2` at X=748.05 (col 755.05), both at Y=−87.65 (lugs engaged
+with rows −133/−95, hook wrap −2.05, plate covering the pair), rod `Rod_M6`
+(Ø6×364) from X=402.05..766.05 through the two bores at Y=−113.65, spools
+`Spool1..3` (Ø70×100) centered on the rod. Verified by the assembly checks
 in `verify_fixture.py` (§ Step D).
 
 ---

@@ -6,8 +6,9 @@ Usage:
 
 Writes into exports/:
     SpoolHolder.stl    printable bracket (print twice)
-    SpoolHolder.3mf    printable bracket (print twice)
+    SpoolHolder.3mf    same geometry, 3MF (deterministic zip timestamps)
     Assembly.glb       full-system preview (GLB 2.0)
+    Assembly.stl       full-system preview (stl)
     Assembly.html      full-system preview (stock FreeCAD WebGL viewer)
 
 FreeCAD's own glTF/GLB exporter serialises nothing in headless mode, and
@@ -312,6 +313,12 @@ def main():
     results.append(glb_target)
     print("  wrote %-28s %8d bytes" % (os.path.basename(glb_target),
                                         os.path.getsize(glb_target)))
+
+    stl_target = os.path.join(OUT, "Assembly.stl")
+    merged.write(stl_target)
+    results.append(stl_target)
+    print("  wrote %-28s %8d bytes" % (os.path.basename(stl_target),
+                                       os.path.getsize(stl_target)))
 
     html_target = os.path.join(OUT, "Assembly.html")
     write_html(objs, html_target)
