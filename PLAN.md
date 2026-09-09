@@ -1,7 +1,11 @@
 # QDN Cable-Spool Holder — Build Plan & FreeCAD Instructions
 
 Project: wall-mounted holder for small cable spools (Ø ~50 mm, 1 mm² wire),
-for the Q-System / QDN perforated panel grid.
+for the common 38 mm × 10 mm perforated-panel grid.
+
+> The "QDN" in the project/folder/file names is this repo's own codename and
+> does not refer to any commercial product or trademark; the wall grid is
+> described purely by its functional dimensions.
 
 Folder: `~/Projekte/qdn-spool-holder/`
 
@@ -18,8 +22,8 @@ Folder: `~/Projekte/qdn-spool-holder/`
   bracket fit can be verified in an assembly before printing.
 
 ### Why not off-the-shelf?
-The RasterPlan® Spulenhalter and QDN 0° hooks all give an axle
-**perpendicular** to the wall. No standard part for this grid offers an
+Commercially available holders for this grid (spool-and-hook style) all give
+an axle **perpendicular** to the wall. No standard part offers an
 **axis parallel to the wall**, so a small custom bracket is justified.
 
 ---
@@ -28,9 +32,9 @@ The RasterPlan® Spulenhalter and QDN 0° hooks all give an axle
 
 | Parameter | Value | Source |
 |---|---|---|
-| Hole shape | square, 10 × 10 mm | manufacturer drawing, DIN 24041 |
-| Hole pitch (c–c) | 38 mm both directions | manufacturer drawing |
-| Panel flat area | 1268 × 190 mm (MTR 02A, 3 segments) | product page |
+| Hole shape | square, 10 × 10 mm | panel spec (DIN 24041-style grid) |
+| Hole pitch (c–c) | 38 mm both directions | measured |
+| Panel flat area | 1268 × 190 mm (3 segments) | measured |
 | Sheet thickness | ~1.2 mm (oversized for easy fixture fit) | user note |
 
 The user's earlier "~27 mm" reading matches **38 mm pitch − 10 mm hole =
@@ -103,7 +107,7 @@ shell.nix                 # nix-shell environment
    - `wall_h` = 190 mm
    - `sheet_t` = 1.2 mm
    - `cols` = 32            (holes horizontally)
-   - `rows` = 5             (holes vertically; manufacturer drawing shows 5)
+   - `rows` = 5             (holes vertically)
 3. **Part Design** → `Create body` → rename `Wall`.
 4. Sketch on XY plane → rectangle 1268 × 190, constrained to
    `<<Params>>.wall_w` / `<<Params>>.wall_h` via expressions (click the
@@ -118,7 +122,7 @@ shell.nix                 # nix-shell environment
    `<<Params>>.pitch`, Occurrences `<<Params>>.rows`.
 10. Save. Verify visually: 32 × 6 square hole grid, 38 mm pitch.
 
-> Note: the grid is centered; exact edge margins of the real MTR 02A do not
+> Note: the grid is centered; exact edge margins of a real panel do not
 > affect bracket verification, only the pitch and hole grid do.
 > If a red/broken feature appears in the tree (e.g. while experimenting with
 > pattern tools), delete it — `verify_fixture.py` fails on invalid features.
@@ -145,7 +149,7 @@ through the wall holes and hook behind the sheet; on the plate, a horizontal
 6. **Toggle lip:** on the *outer end* of each lug, add a small square boss
    `toggle_lip` × `lug_size` × 2 mm so it hooks behind the sheet. (May need a
    pocket first to create the hook seat — iterate to taste; keep the lip
-   on the side that faces the adjacent hole, QDN-style. The diagonal
+   on the side that faces the adjacent hole (hook-latch style). The diagonal
    lead-in is intentional; the verifier *measures* insertion clearance and
    self-locking instead of banning it.)
 7. Axle holder (pylon style, connects itself — no manual fusion needed):
