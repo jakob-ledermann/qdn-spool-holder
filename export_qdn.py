@@ -10,6 +10,7 @@ Writes into exports/:
     Assembly.glb       full-system preview (GLB 2.0)
     Assembly.stl       full-system preview (stl)
     Assembly.html      full-system preview (stock FreeCAD WebGL viewer)
+    index.html         same viewer, GitHub Pages landing page
 
 FreeCAD's own glTF/GLB exporter serialises nothing in headless mode, and
 importers.importWebGL pulls in Qt/PySide6 which segfaults freecadcmd at
@@ -325,6 +326,12 @@ def main():
     results.append(html_target)
     print("  wrote %-28s %8d bytes" % (os.path.basename(html_target),
                                         os.path.getsize(html_target)))
+
+    index_target = os.path.join(OUT, "index.html")
+    write_html(objs, index_target)
+    results.append(index_target)
+    print("  wrote %-28s %8d bytes" % (os.path.basename(index_target),
+                                        os.path.getsize(index_target)))
     App.closeDocument(asm.Name)
 
     ok = True

@@ -246,6 +246,7 @@ Writes into `exports/` (committed to the repo so GitHub renders STL/3MF inline):
 | `exports/SpoolHolder.3mf` | printable bracket, 3MF | slice & print ×2 |
 | `exports/Assembly.glb` | full-system mesh preview | drag into viewers/slicers |
 | `exports/Assembly.html` | interactive view (three.js 0.172 from CDN — needs internet) | open in a browser |
+| `exports/index.html` | same viewer; landing page for the GitHub Pages site | served at the site root |
 
 Print settings: PLA/PETG, 0.2 mm layers, 2–3 walls, ~25 % infill, no supports
 (plate faces the build plate, lugs/lips point up).
@@ -270,9 +271,16 @@ Notes / quirks discovered:
 1. `verify_fixture.py` — gate; fails the job on any failed check.
 2. `export_qdn.py` — regenerates `exports/`.
 3. Upload `exports/` as a workflow artifact.
-4. Commit `exports/` back to `main` (no-op when nothing changed; can't loop,
+4. **Deploy `exports/` to GitHub Pages** (`configure-pages@v5` →
+   `upload-pages-artifact@v3` → `deploy-pages@v5`, environment
+   `github-pages`). The site root serves `exports/index.html`, i.e. the
+   interactive assembly viewer.
+5. Commit `exports/` back to `main` (no-op when nothing changed; can't loop,
    because `push` triggers only on `*.FCStd`, `*.py`, `PLAN.md`,
    `.github/workflows/*`).
+
+One-time repo setting (cannot be done from the repo itself): **Settings →
+Pages → Source = "GitHub Actions"**. Without it `deploy-pages@v5` fails.
 
 Trigger manually via **Actions → Export → Run workflow**.
 
